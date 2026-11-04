@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BenchSight test bench</title>
+<style>
+  :root { --bg:#0f1412; --panel:#18201c; --text:#e8efe9; --muted:#93a39a; --accent:#00e676; --warn:#ffb300; --bad:#ff5252; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:12px 16px; border-bottom:1px solid #26302b; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; color:var(--accent); }
+  .pill { background:#26302b; padding:3px 10px; border-radius:99px; color:var(--muted); font-size:13px; }
+  main { display:grid; grid-template-columns: 1.2fr 1fr; gap:16px; padding:16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel { background:var(--panel); border-radius:10px; padding:14px; }
+  button { background:var(--accent); color:#002b12; border:0; padding:9px 14px; border-radius:8px; font-weight:600; cursor:pointer; }
+  button.secondary { background:#26302b; color:var(--text); }
+  button.rec { background:var(--bad); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  input[type=text] { flex:1; min-width:180px; padding:9px; border-radius:8px; border:1px solid #33403a; background:#0f1412; color:var(--text); }
+  #view img { width:100%; border-radius:8px; display:block; }
+  #log { max-height:52vh; overflow:auto; }
+  .msg { margin:8px 0; padding:8px 10px; border-radius:8px; background:#111815; }
+  .msg .who { font-size:12px; color:var(--muted); }
+  .msg div:last-child { white-space:pre-line; }
+  .msg.tech { border-left:3px solid var(--warn); }
+  .msg.bot { border-left:3px solid var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { border-bottom:1px solid #26302b; padding:5px; text-align:left; vertical-align:top; }
+  .abnormal { color:var(--bad); font-weight:600; } .normal { color:var(--accent); }
+  .err { color:var(--bad); }
+  .calls { font:12px/1.5 ui-monospace, Consolas, monospace; max-height:30vh; overflow:auto; background:#0b0f0d; border-radius:8px; padding:8px; }
+  .calls .m { color:var(--accent); } .calls .f { color:var(--bad); }
+  select.pill { border:0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BenchSight</h1>
+  <span class="pill" id="sess">no session</span>
+  <span class="pill" id="phase">-</span>
+  <span class="pill" id="spent">-</span>
+  <button id="newBtn">New session</button>
+  <label class="pill"><input type="checkbox" id="follow"> Follow phone session</label>
+  <select id="runSel" class="pill"><option value="">Recorded runs (judge mode)…</option></select>
+</header>
+<main>
+  <section class="panel">
+    <div class="row">
+      <label><input type="radio" name="kind" value="overview" checked> Overview</label>
+      <label><input type="radio" name="kind" value="closeup"> Close-up</label>
+      <input type="file" id="img" accept="image/*" capture="environment">
+      <button id="sendImg" class="secondary">Send photo</button>
+    </div>
+    <div id="view"></div>
+  </section>
+  <section class="panel">
+    <div class="row">
+      <button id="recBtn">Hold to talk</button>
+      <input type="text" id="txt" placeholder="…or type what the technician says">
+      <button id="sendTxt" class="secondary">Send</button>
+    </div>
+    <div id="log"></div>
+    <h3>Evidence log</h3>
+    <table id="ev"><thead><tr><th>#</th><th>Test point</th><th>Expected</th><th>Reading</th><th>Verdict</th></tr></thead><tbody></tbody></table>
+    <h3>Live Meta model calls</h3>
+    <div id="calls" class="calls"></div>
+  </section>
+</main>
+<script>
+let sid = null;
+const $ = (id) => document.getElementById(id);
+const VOICE_LANG = { telugu: "te-IN", tamil: "ta-IN", hindi: "hi-IN", mixed: "te-IN", english: "en-IN" };
+
+function add(who, text, cls) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  d.innerHTML = `<div class="who">${who}</div>`;
+  const t = document.createElement("div"); t.textContent = text; d.appendChild(t);
+  $("log").appendChild(d); $("log").scrollTop = 1e9;
+}
+
+function speak(text, lang) {
+  if (!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = VOICE_LANG[lang] || "en-IN";
+  const v = speechSynthesis.getVoices().find(v => v.lang === u.lang);
+  if (v) u.voice = v; else u.lang = "en-IN";
+  speechSynthesis.speak(u);
+}
+
+function renderCalls(calls) {
+  const el = $("calls"); if (!el) return;
+  el.innerHTML = calls.slice(-40).map(c => {
+    const tok = c.input_tokens != null ? ` in:${c.input_tokens} out:${c.output_tokens}` : "";
+    const extra = c.matches != null ? ` matches:${c.matches}` : (c.transcript ? ` "${c.transcript}"` : "");
+    const ok = c.ok === false ? `<span class="f"> FAILED: ${(c.error||"").slice(0,80)}</span>` : "";
+    return `<div>${(c.ts||"").slice(11)} <span class="m">${c.model}</span> ${c.purpose}${c.effort ? " ("+c.effort+")" : ""} ${c.latency_s ?? ""}s${tok}${extra}${ok}</div>`;
+  }).join("");
+  el.scrollTop = 1e9;
+}
+async function refreshCalls() {
+  if (!sid) return;
+  try { renderCalls((await (await fetch(`/api/session/${sid}/trace`)).json()).calls || []); } catch {}
+}
+
+async function refreshHealth() {
+  const h = await (await fetch("/api/health")).json();
+  $("spent").textContent = `~$${h.spent_usd_est} of $${h.budget_usd}`;
+}
+
+function show(r) {
+  if (r.error) { add("error", r.error, "bot err"); return; }
+  if (r.heard) add("technician (heard)", r.heard, "tech");
+  const local = r.say_local && r.say_local !== r.say_en ? `\n${r.say_local}` : "";
+  add("BenchSight", r.say_en + local, "bot");
+  const pd = r.pending;
+  if (pd && pd.action === "request_measurement") {
+    const rng = `${pd.expected_min ?? ""}–${pd.expected_max ?? ""} ${pd.expected_unit || ""}`;
+    add("measurement request", `Point: ${pd.test_point}\nMeter: ${pd.meter_mode} · Power: ${pd.power_state} · Expected: ${rng}`, "bot");
+  }
+  const voiceText = (r.language && r.language !== "english" && r.say_local) ? r.say_local : r.say_en;
+  speak(voiceText, r.language);
+  $("phase").textContent = r.phase;
+  if (r.highlight) $("view").innerHTML = `<img src="/api/session/${sid}/file/${r.highlight}?t=${Date.now()}">`;
+  const tb = $("ev").querySelector("tbody"); tb.innerHTML = "";
+  (r.evidence || []).forEach(e => {
+    const exp = e.expected ? `${e.expected.min ?? ""}–${e.expected.max ?? ""} ${e.expected.unit || ""}` : "";
+    tb.insertAdjacentHTML("beforeend",
+      `<tr><td>${e.id}</td><td>${e.test_point || ""}</td><td>${exp}</td><td>${e.value ?? ""} ${e.unit || ""}</td><td class="${e.verdict}">${e.verdict}</td></tr>`);
+  });
+  refreshHealth(); refreshCalls();
+}
+
+async function post(path, opts) {
+  const r = await fetch(`/api/session/${sid}${path}`, { method: "POST", ...opts });
+  try { return await r.json(); } catch { return { error: `HTTP ${r.status}` }; }
+}
+
+$("newBtn").onclick = async () => {
+  const r = await (await fetch("/api/session", { method: "POST" })).json();
+  sid = r.session; $("sess").textContent = sid; $("phase").textContent = r.phase;
+  $("log").innerHTML = ""; $("view").innerHTML = ""; add("BenchSight", r.say_en, "bot"); refreshHealth();
+};
+
+$("sendImg").onclick = async () => {
+  if (!sid) return alert("Start a session first");
+  const f = $("img").files[0]; if (!f) return alert("Choose a photo");
+  $("view").innerHTML = `<img src="${URL.createObjectURL(f)}">`;
+  const fd = new FormData(); fd.append("file", f);
+  fd.append("kind", document.querySelector("input[name=kind]:checked").value);
+  add("you", `sent photo (${fd.get("kind")})`, "tech");
+  show(await post("/image", { body: fd }));
+};
+
+$("sendTxt").onclick = async () => {
+  if (!sid) return alert("Start a session first");
+  const t = $("txt").value.trim(); if (!t) return;
+  $("txt").value = "";
+  show(await post("/text", { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: t }) }));
+};
+$("txt").addEventListener("keydown", e => { if (e.key === "Enter") $("sendTxt").click(); });
+
+// --- push-to-talk: record, convert to 24 kHz mono 16-bit WAV in the browser ---
+let rec, chunks = [];
+function wavFromBuffer(buf) {
+  const rate = 24000, ch = buf.getChannelData(0);
+  const ratio = buf.sampleRate / rate, n = Math.floor(ch.length / ratio);
+  const pcm = new Int16Array(n);
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, ch[Math.floor(i * ratio)])); pcm[i] = s * 0x7fff; }
+  const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+  const w = (o, s) => [...s].forEach((c, i) => out.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); out.setUint32(4, 36 + pcm.length * 2, true); w(8, "WAVE"); w(12, "fmt ");
+  out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+  w(36, "data"); out.setUint32(40, pcm.length * 2, true);
+  pcm.forEach((v, i) => out.setInt16(44 + i * 2, v, true));
+  return new Blob([out], { type: "audio/wav" });
+}
+async function startRec() {
+  if (!sid) return alert("Start a session first");
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  chunks = []; rec = new MediaRecorder(stream);
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop());
+    const ab = await new Blob(chunks).arrayBuffer();
+    const buf = await new AudioContext().decodeAudioData(ab);
+    const fd = new FormData(); fd.append("file", wavFromBuffer(buf), "clip.wav");
+    show(await post("/audio", { body: fd }));
+  };
+  rec.start(); $("recBtn").className = "rec"; $("recBtn").textContent = "Recording… release to send";
+}
+function stopRec() {
+  if (rec && rec.state === "recording") rec.stop();
+  $("recBtn").className = ""; $("recBtn").textContent = "Hold to talk";
+}
+$("recBtn").addEventListener("mousedown", startRec);
+$("recBtn").addEventListener("mouseup", stopRec);
+$("recBtn").addEventListener("touchstart", e => { e.preventDefault(); startRec(); });
+$("recBtn").addEventListener("touchend", e => { e.preventDefault(); stopRec(); });
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
+
+// --- follow the latest session (the phone app) live on the laptop screen ---
+let lastFollowKey = "";
+setInterval(async () => {
+  if (!$("follow").checked) return;
+  try {
+    const r = await (await fetch("/api/latest")).json();
+    if (!r.session) return;
+    const st = r.state, key = r.session + ":" + (st.history || []).length + ":" + (r.calls || []).length;
+    renderCalls(r.calls || []);
+    if (key === lastFollowKey) return;
+    lastFollowKey = key; sid = r.session;
+    $("sess").textContent = "phone: " + r.session; $("phase").textContent = st.phase;
+    $("log").innerHTML = "";
+    (st.history || []).forEach(h => {
+      if (h.heard) add("technician (heard)", h.heard, "tech");
+      add("BenchSight", h.say_en + (h.say_local && h.say_local !== h.say_en ? "\n" + h.say_local : ""), "bot");
+    });
+    const tb = $("ev").querySelector("tbody"); tb.innerHTML = "";
+    (st.evidence || []).forEach(ev => {
+      const exp = ev.expected ? `${ev.expected.min ?? ""}–${ev.expected.max ?? ""} ${ev.expected.unit || ""}` : "";
+      tb.insertAdjacentHTML("beforeend", `<tr><td>${ev.id}</td><td>${ev.test_point || ""}</td><td>${exp}</td><td>${ev.value ?? ""} ${ev.unit || ""}</td><td class="${ev.verdict}">${ev.verdict}</td></tr>`);
+    });
+    const img = r.highlight || r.image;
+    if (img) $("view").innerHTML = `<img src="/api/session/${r.session}/file/${img}?t=${Date.now()}">`;
+    refreshHealth();
+  } catch {}
+}, 2000);
+
+// --- judge mode: view a recorded run (no API key needed) ---
+(async () => {
+  try {
+    const r = await (await fetch("/api/runs")).json();
+    (r.runs || []).forEach(id => $("runSel").insertAdjacentHTML("beforeend", `<option value="${id}">${id}</option>`));
+  } catch {}
+})();
+$("runSel").onchange = async (e) => {
+  const id = e.target.value; if (!id) return;
+  const r = await (await fetch(`/api/runs/${id}`)).json();
+  sid = null; $("sess").textContent = "recorded: " + id; $("phase").textContent = r.state.phase;
+  $("log").innerHTML = "";
+  (r.state.history || []).forEach(h => {
+    if (h.heard) add("technician (heard)", h.heard, "tech");
+    add("BenchSight", h.say_en + (h.say_local && h.say_local !== h.say_en ? "\n" + h.say_local : ""), "bot");
+  });
+  const tb = $("ev").querySelector("tbody"); tb.innerHTML = "";
+  (r.state.evidence || []).forEach(ev => {
+    const exp = ev.expected ? `${ev.expected.min ?? ""}–${ev.expected.max ?? ""} ${ev.expected.unit || ""}` : "";
+    tb.insertAdjacentHTML("beforeend", `<tr><td>${ev.id}</td><td>${ev.test_point || ""}</td><td>${exp}</td><td>${ev.value ?? ""} ${ev.unit || ""}</td><td class="${ev.verdict}">${ev.verdict}</td></tr>`);
+  });
+  $("view").innerHTML = (r.images || []).map(f => `<img style="margin-bottom:8px" src="/api/runs/${id}/file/${f}">`).join("");
+  renderCalls(r.calls || []);
+};
+</script>
+</body>
+</html>
