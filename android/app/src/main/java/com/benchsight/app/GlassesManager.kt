@@ -44,6 +44,11 @@ class GlassesManager(private val context: Context, private val scope: CoroutineS
     private val _ready = MutableStateFlow(false) // camera stream active, photos can be captured
     val ready: StateFlow<Boolean> = _ready
 
+    // Live viewfinder built from the glasses video stream (luma channel, downscaled, ~8 fps).
+    private val _preview = MutableStateFlow<Bitmap?>(null)
+    val preview: StateFlow<Bitmap?> = _preview
+    private var lastPreviewMs = 0L
+
     private var initialized = false
     private var session: DeviceSession? = null
     private var camera: Camera? = null
@@ -121,6 +126,16 @@ class GlassesManager(private val context: Context, private val scope: CoroutineS
                         _status.value = "Glasses camera: $st"
                     }
                 }
+                scope.launch(Dispatchers.Default) {
+                    cam.stream.videoStream.collect { frame ->
+                        val now = System.currentTimeMillis()
+                        if (now - lastPreviewMs < 120) return@collect
+                        lastPreviewMs = now
+                        try {
+                            lumaPreview(frame.buffer, frame.width, frame.height)?.let { _preview.value = it }
+                        } catch (_: Exception) { /* skip a malformed frame */ }
+                    }
+                }
                 cam.stream.start().onFailure { error, _ -> _status.value = "Stream failed: ${error.description}" }
             },
             onFailure = { error, _ -> _status.value = "Camera failed: ${error.description}" },
@@ -141,12 +156,38 @@ class GlassesManager(private val context: Context, private val scope: CoroutineS
         }
     }
 
+    /**
+     * The SDK delivers decoded frames as YUV 4:2:0 pixel data. The first plane is luma (brightness) in every
+     * 4:2:0 layout, so a grayscale preview from it is always correct, whatever the chroma layout.
+     */
+    private fun lumaPreview(data: ByteBuffer, w: Int, h: Int): Bitmap? {
+        if (w <= 0 || h <= 0) return null
+        val buf = data.duplicate().apply { rewind() }
+        val total = buf.remaining()
+        val stride = maxOf(w, total / (h * 3 / 2))
+        if (stride.toLong() * h > total) return null
+        val step = maxOf(1, w / 480)
+        val ow = w / step
+        val oh = h / step
+        val px = IntArray(ow * oh)
+        var i = 0
+        for (y in 0 until oh) {
+            val row = y * step * stride
+            for (x in 0 until ow) {
+                val v = buf.get(row + x * step).toInt() and 0xFF
+                px[i++] = (0xFF shl 24) or (v shl 16) or (v shl 8) or v
+            }
+        }
+        return Bitmap.createBitmap(px, ow, oh, Bitmap.Config.ARGB_8888)
+    }
+
     fun stop() {
         camera?.stop()
         session?.stop()
         camera = null
         session = null
         _ready.value = false
+        _preview.value = null
     }
 
     // Glasses store orientation in EXIF, which BitmapFactory does not apply.

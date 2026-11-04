@@ -1,0 +1,95 @@
+{
+  "id": "20261105-005755-4cb3",
+  "phase": "diagnosing",
+  "board": {
+    "views": [
+      {
+        "path": "img_1_overview.jpg",
+        "read": {
+          "board_ids": [],
+          "damage": [],
+          "labels": [],
+          "maker": "unknown",
+          "side": "component_side",
+          "uncertain": [
+            "Rev:1.0",
+            "2017-12-01",
+            "Made In China"
+          ]
+        }
+      },
+      {
+        "path": "img_2_overview.jpg",
+        "read": {
+          "board_ids": [
+            "5B20U61837",
+            "855B20U61837C1KS95U0GVT"
+          ],
+          "damage": [],
+          "labels": [],
+          "maker": "lenovo",
+          "side": "component_side",
+          "uncertain": [
+            "JDIMM1"
+          ]
+        }
+      }
+    ],
+    "ids": [
+      "5B20U61837",
+      "855B20U61837C1KS95U0GVT"
+    ],
+    "confirmed": true,
+    "maker": "lenovo",
+    "labels": [],
+    "damage": []
+  },
+  "symptom": "deadboard no power",
+  "evidence": [],
+  "pending": {
+    "test_point": "DC jack solder pins behind DC input connector",
+    "locate_noun": "connector",
+    "locate_description": "DC power jack at board edge",
+    "meter_mode": "dc_voltage",
+    "power_state": "adapter_connected",
+    "expected_min": 19,
+    "expected_max": 20,
+    "expected_unit": "V",
+    "why": "Confirm adapter power reaches board before further checks.",
+    "action": "request_measurement",
+    "locate_info": {
+      "sam_matches": 0,
+      "noun": "connector"
+    }
+  },
+  "overview_path": "img_2_overview.jpg",
+  "language": "english",
+  "history": [
+    {
+      "heard": null,
+      "say_en": "I can't read a board ID clearly. Please tell me the board model, or show me the printed ID closer.",
+      "say_local": "I can't read a board ID clearly. Please tell me the board model, or show me the printed ID closer.",
+      "phase": "confirm_board"
+    },
+    {
+      "heard": null,
+      "say_en": "I read the board number 5B20U61837 (also 855B20U61837C1KS95U0GVT). Please check it against the board. Partly readable: JDIMM1. Is it correct?",
+      "say_local": "I read the board number 5B20U61837 (also 855B20U61837C1KS95U0GVT). Please check it against the board. Partly readable: JDIMM1. Is it correct?",
+      "phase": "confirm_board"
+    },
+    {
+      "heard": "yes it is correct.",
+      "say_en": "Board confirmed. What is the problem with this laptop?",
+      "say_local": "Board confirmed. What is the problem with this laptop?",
+      "phase": "need_symptom"
+    },
+    {
+      "heard": "it's a deadboard no power no multimeter right now what should be checked first..",
+      "say_en": "Set DC voltage, red on DC jack positive pin, black on ground, expect about 19 to 20 volts.",
+      "say_local": "Set DC voltage, red on DC jack positive pin, black on ground, expect about 19 to 20 volts.",
+      "phase": "diagnosing"
+    }
+  ],
+  "judge_failures": 0,
+  "proposed": null
+}

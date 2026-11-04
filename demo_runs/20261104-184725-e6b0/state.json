@@ -1,0 +1,131 @@
+{
+  "id": "20261104-184725-e6b0",
+  "phase": "diagnosing",
+  "board": {
+    "views": [
+      {
+        "path": "img_1_overview.jpg",
+        "read": {
+          "board_ids": [],
+          "damage": [],
+          "labels": [],
+          "maker": "hp",
+          "side": "in_chassis",
+          "uncertain": []
+        }
+      },
+      {
+        "path": "img_2_closeup.jpg",
+        "read": {
+          "board_ids": [],
+          "damage": [],
+          "labels": [],
+          "maker": "HP",
+          "side": "in_chassis",
+          "uncertain": []
+        }
+      },
+      {
+        "path": "img_3_overview.jpg",
+        "read": {
+          "board_ids": [
+            "0P5N"
+          ],
+          "damage": [],
+          "labels": [],
+          "maker": "unknown",
+          "side": "in_chassis",
+          "uncertain": [
+            "SAMSUNG memory sticker text",
+            "QR code sticker text",
+            "white service tag text"
+          ]
+        }
+      }
+    ],
+    "ids": [
+      "0P5N"
+    ],
+    "confirmed": true,
+    "maker": "HP",
+    "labels": [],
+    "damage": []
+  },
+  "symptom": "the display is not appearing.",
+  "evidence": [
+    {
+      "id": 1,
+      "kind": "measurement",
+      "test_point": "DC jack positive solder pad at DC input connector",
+      "meter_mode": "dc_voltage",
+      "power_state": "adapter_connected",
+      "expected": {
+        "min": 19,
+        "max": 20,
+        "unit": "V"
+      },
+      "value": 19.5,
+      "unit": "V",
+      "verdict": "normal",
+      "heard": "19.5 volts at the jack already checked adapter is fine laptop doesn't power on skip the basics what's next"
+    }
+  ],
+  "pending": {
+    "test_point": "capacitor leg just below MODEL 0P5N print next to black cooling bar",
+    "locate_noun": "capacitor",
+    "locate_description": "capacitor next to the black cooling bar below MODEL 0P5N print",
+    "meter_mode": "dc_voltage",
+    "power_state": "adapter_connected",
+    "expected_min": 3.0,
+    "expected_max": 3.5,
+    "expected_unit": "V",
+    "why": "Adapter is good but no power, so standby rail may be missing.",
+    "action": "request_measurement",
+    "locate_info": {
+      "sam_matches": 0,
+      "noun": "capacitor"
+    }
+  },
+  "overview_path": "img_3_overview.jpg",
+  "language": "english",
+  "history": [
+    {
+      "heard": null,
+      "say_en": "I can't read a board ID clearly. Please tell me the board model, or show me the printed ID closer.",
+      "say_local": "I can't read a board ID clearly. Please tell me the board model, or show me the printed ID closer.",
+      "phase": "confirm_board"
+    },
+    {
+      "heard": null,
+      "say_en": "I can't read a board ID clearly. Please tell me the board model, or show me the printed ID closer.",
+      "say_local": "I can't read a board ID clearly. Please tell me the board model, or show me the printed ID closer.",
+      "phase": "confirm_board"
+    },
+    {
+      "heard": null,
+      "say_en": "I read the board number 0P5N. Please check it against the board. Partly readable: SAMSUNG memory sticker text, QR code sticker text. Is it correct?",
+      "say_local": "I read the board number 0P5N. Please check it against the board. Partly readable: SAMSUNG memory sticker text, QR code sticker text. Is it correct?",
+      "phase": "confirm_board"
+    },
+    {
+      "heard": "AC is correct.",
+      "say_en": "Board confirmed. What is the problem with this laptop?",
+      "say_local": "Board confirmed. What is the problem with this laptop?",
+      "phase": "need_symptom"
+    },
+    {
+      "heard": "the display is not appearing.",
+      "say_en": "Set DC voltage mode, red probe on DC jack positive pin and black on ground, expect about 19 to 20 volts.",
+      "say_local": "Set DC voltage mode, red probe on DC jack positive pin and black on ground, expect about 19 to 20 volts.",
+      "phase": "diagnosing"
+    },
+    {
+      "heard": "19.5 volts at the jack already checked adapter is fine laptop doesn't power on skip the basics what's next",
+      "say_en": "Set DC voltage mode, red on that capacitor leg, black on ground screw. Expect about 3 to 3.5 volts.",
+      "say_local": "Set DC voltage mode, red on that capacitor leg, black on ground screw. Expect about 3 to 3.5 volts.",
+      "phase": "diagnosing"
+    }
+  ],
+  "judge_failures": 0,
+  "proposed": null
+}
