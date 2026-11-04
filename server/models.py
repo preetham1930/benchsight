@@ -11,7 +11,6 @@ import io
 import json
 import os
 import re
-import sys
 import time
 import uuid
 
@@ -27,7 +26,8 @@ _client = None
 def _key() -> str:
     key = os.environ.get("MODEL_API_KEY")
     if not key:
-        sys.exit("MODEL_API_KEY is not set. Open a new PowerShell window after running setx.")
+        raise ModelError("MODEL_API_KEY is not set. Put your key in .env (see .env.example) or set the "
+                         "MODEL_API_KEY environment variable. Judge mode (recorded runs) works without a key.")
     return key
 
 

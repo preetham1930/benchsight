@@ -109,7 +109,7 @@ async function refreshCalls() {
 
 async function refreshHealth() {
   const h = await (await fetch("/api/health")).json();
-  $("spent").textContent = `~$${h.spent_usd_est} of $${h.budget_usd}`;
+  $("spent").textContent = `server spend ~$${h.spent_usd_est} of $${h.budget_usd} budget`;
 }
 
 function show(r) {
